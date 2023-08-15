@@ -120,6 +120,4 @@ public class RobberMove : Movement
             controller.GetComponent<Controller>().EndGame(true);                       
         }
     }
-
-   
 }

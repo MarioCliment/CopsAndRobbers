@@ -1,5 +1,6 @@
 ﻿using System.Collections;
 using System.Collections.Generic;
+using System.Linq;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -48,15 +49,52 @@ public class Controller : MonoBehaviour
 
     public void InitAdjacencyLists()
     {
-        //Matriz de adyacencia
+        // Matriz de adyacencia
+        // Porque es 64x64 (i,j)? Pues porque i representa la casilla y j representa las casillas adjacentes a esa casilla
         int[,] matriu = new int[Constants.NumTiles, Constants.NumTiles];
 
         //TODO: Inicializar matriz a 0's
+        for (int i=0; i<Constants.NumTiles; i++)
+        {
+            for(int j=0; j<Constants.NumTiles-1; j++)
+            {
+                // simplemente, inicializamos todo a 0
+                matriu[i, j]=0;
+            }
+        }
 
         //TODO: Para cada posición, rellenar con 1's las casillas adyacentes (arriba, abajo, izquierda y derecha)
+        for (int i = 0; i < Constants.NumTiles; i++)
+        {
+            for (int j = 0; j < Constants.NumTiles; j++)
+            {
+                // i>7 porque cualquier casilla (i) que no sea mayor de 7 es porque está en la fila de abajo del todo, lo 
+                // que quiere decir que no hay más casillas por debajo
+                // abajo
+                if (i>7)  matriu[i, i - 8] = 1;
+                // i<56 es un caso similar, si la casilla no es menor que 56 es porque esta en la fila de arriba del todo!
+                // arriba
+                if (i<56) matriu[i, i + 8] = 1;
+                // Todas las casillas de la izquierda del todo son múltiplos de 8, con lo que no tienen nada a la izquierda si el resto es 0
+                // izquierda
+                if (i%8!=0) matriu[i, i - 1] = 1;
+                // lo mismo con las de la derecha, pero al dividir entre 8, las que tengan resto de 7, están a la derecha (23-8 = 15 - 8 = 7) 
+                // derecha
+                if (i%8!=7) matriu[i, i + 1] = 1;
+            }
+        }
 
         //TODO: Rellenar la lista "adjacency" de cada casilla con los índices de sus casillas adyacentes
-
+        for (int i = 0; i<Constants.NumTiles; i++)
+        {
+            for (int j = 0; j<Constants.NumTiles; j++)
+            {
+                // ¡Joe Biden!
+                // Aqui añadimos la j a las casillas! Que si te fijas arriba, en los i - 8, i + 8, etc, esos son las j!
+                // Y por supuesto, solo añadimos las que son 1, es decir, las que son adyacentes!
+                if (matriu[i, j] == 1) tiles[i].adjacency.Add(j);
+            }
+        }
     }
 
     //Reseteamos cada casilla: color, padre, distancia y visitada
@@ -140,12 +178,49 @@ public class Controller : MonoBehaviour
         tiles[clickedTile].current = true;
         FindSelectableTiles(false);
 
-        /*TODO: Cambia el código de abajo para hacer lo siguiente
-        - Elegimos una casilla aleatoria entre las seleccionables que puede ir el caco
-        - Movemos al caco a esa casilla
-        - Actualizamos la variable currentTile del caco a la nueva casilla
-        */
-        robber.GetComponent<RobberMove>().MoveToTile(tiles[robber.GetComponent<RobberMove>().currentTile]);
+        //TODO: Cambia el código de abajo para hacer lo siguiente
+        //- Elegimos una casilla aleatoria (ya no es aleatoria! ahora es la mas lejana!) entre las seleccionables que puede ir el caco
+        Tile casillaLejosPolis = GetFurthestTileFromCops();
+        int casillaLejosPolisNumero = casillaLejosPolis.numTile;
+        //- Movemos al caco a esa casilla
+        robber.GetComponent<RobberMove>().MoveToTile(casillaLejosPolis);
+        //- Actualizamos la variable currentTile del caco a la nueva casilla
+        robber.GetComponent<RobberMove>().currentTile = casillaLejosPolisNumero;
+
+    }
+
+    public Tile GetFurthestTileFromCops()
+    {
+        // Tiene que ser null, si no Unity llora que te cagas
+        Tile furthest = null;
+        float distanceToCops;
+        float auxDistance = 0;
+        //GameObject nearestCop = null;
+        foreach (Tile tile in tiles)
+        {
+            if (tile.selectable)
+            {
+                distanceToCops = 0;
+                Debug.Log("Mirando la casilla " + tile.numTile);
+                //Compruebas todos los policias, en el caso de que la casilla anterior sea mayor a la obtenida nuevamente
+                //se sustituye automaticamente en el bucle, siendo este un sistema modular ya que puedes tener tantos
+                //policias como quieras
+
+                foreach (GameObject cop in cops)
+                {
+                    distanceToCops = Vector3.Distance(tile.transform.position, cop.transform.position) + distanceToCops;
+                }
+                Debug.Log("Distancia a los polis " + distanceToCops);
+                if (distanceToCops > auxDistance)
+                {
+                    Debug.Log("Distancia a los polis es mayor " + distanceToCops);
+                    auxDistance = distanceToCops;
+                    furthest = tile;
+                }
+            }
+        }
+        Debug.Log("Casilla mas lejana" + furthest.numTile);
+        return furthest;
     }
 
     public void EndGame(bool end)
@@ -204,9 +279,22 @@ public class Controller : MonoBehaviour
 
         //TODO: Implementar BFS. Los nodos seleccionables los ponemos como selectable=true
         //Tendrás que cambiar este código por el BFS
-        for(int i = 0; i < Constants.NumTiles; i++)
+        for (int i = 0; i < Constants.NumTiles; i++)
         {
-            tiles[i].selectable = true;
+            // inicializamos todas las casillas como false
+            tiles[i].selectable = false;
+        }
+
+        // Y aqui simplemente asignamos a las casillas adyacentes de la posicion actual (indexcurrentTile) el atributo de seleccionables,
+        // y también a las adyacentes de las adyacentes
+        foreach (int casillaAdyacente in tiles[indexcurrentTile].adjacency)
+        {
+            tiles[casillaAdyacente].selectable = true;
+
+            foreach (int casillaAdyacente2 in tiles[casillaAdyacente].adjacency)
+            {
+                tiles[casillaAdyacente2].selectable = true;
+            }
         }
 
 
